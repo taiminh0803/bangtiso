@@ -207,116 +207,105 @@
     </div>
 
     <script>
-        // Khởi tạo giá trị từ localStorage
-        let t1Name = localStorage.getItem('t1_name') || 'TEAM 1';
-        let t2Name = localStorage.getItem('t2_name') || 'TEAM 2';
-        let score1 = parseInt(localStorage.getItem('t1_score')) || 0;
-        let score2 = parseInt(localStorage.getItem('t2_score')) || 0;
-        
-        // Đồng hồ (tính bằng giây, giới hạn tối đa 45 phút = 2700 giây)
-        let totalSeconds = parseInt(localStorage.getItem('t_seconds')) || 0;
-        let timerInterval = null;
-        let isRunning = localStorage.getItem('t_running') === 'true';
+        // Hàm lấy dữ liệu (Ưu tiên đọc từ LocalStorage)
+        function loadData() {
+            let t1Name = localStorage.getItem('t1_name') || 'TEAM 1';
+            let t2Name = localStorage.getItem('t2_name') || 'TEAM 2';
+            let score1 = parseInt(localStorage.getItem('t1_score')) || 0;
+            let score2 = parseInt(localStorage.getItem('t2_score')) || 0;
+            let totalSeconds = parseInt(localStorage.getItem('t_seconds')) || 0;
+            let isRunning = localStorage.getItem('t_running') === 'true';
 
-        // Gán giá trị ban đầu vào form
-        document.getElementById('input-team1').value = t1Name;
-        document.getElementById('input-team2').value = t2Name;
-
-        updateUI();
-
-        if (isRunning) {
-            runTimerEngine();
+            return { t1Name, t2Name, score1, score2, totalSeconds, isRunning };
         }
 
-        // Cập nhật tên đội
-        function updateTeamNames() {
-            t1Name = document.getElementById('input-team1').value || 'TEAM 1';
-            t2Name = document.getElementById('input-team2').value || 'TEAM 2';
-            localStorage.setItem('t1_name', t1Name);
-            localStorage.setItem('t2_name', t2Name);
-            updateUI();
-        }
+        // Đồng bộ hiển thị lên giao diện
+        function renderUI() {
+            let data = loadData();
+            
+            document.getElementById('view-team1').innerText = data.t1Name;
+            document.getElementById('view-team2').innerText = data.t2Name;
+            document.getElementById('view-score1').innerText = data.score1;
+            document.getElementById('view-score2').innerText = data.score2;
+            document.getElementById('ctrl-score1').innerText = data.score1;
+            document.getElementById('ctrl-score2').innerText = data.score2;
+            document.getElementById('view-timer').innerText = formatTime(data.totalSeconds);
 
-        // Thay đổi điểm số
-        function changeScore(team, delta) {
-            if (team === 1) {
-                score1 += delta;
-                if (score1 < 0) score1 = 0;
-                localStorage.setItem('t1_score', score1);
-            } else {
-                score2 += delta;
-                if (score2 < 0) score2 = 0;
-                localStorage.setItem('t2_score', score2);
+            if (document.activeElement !== document.getElementById('input-team1')) {
+                document.getElementById('input-team1').value = data.t1Name;
             }
-            updateUI();
+            if (document.activeElement !== document.getElementById('input-team2')) {
+                document.getElementById('input-team2').value = data.t2Name;
+            }
         }
 
-        // --- CÁC HÀM ĐIỀU KHIỂN ĐỒNG HỒ ---
         function formatTime(seconds) {
             let m = Math.floor(seconds / 60);
             let s = seconds % 60;
             return (m < 10 ? "0" + m : m) + ":" + (s < 10 ? "0" + s : s);
         }
 
+        function updateTeamNames() {
+            let t1 = document.getElementById('input-team1').value;
+            let t2 = document.getElementById('input-team2').value;
+            localStorage.setItem('t1_name', t1);
+            localStorage.setItem('t2_name', t2);
+            renderUI();
+        }
+
+        function changeScore(team, delta) {
+            let data = loadData();
+            if (team === 1) {
+                let newS1 = Math.max(0, data.score1 + delta);
+                localStorage.setItem('t1_score', newS1);
+            } else {
+                let newS2 = Math.max(0, data.score2 + delta);
+                localStorage.setItem('t2_score', newS2);
+            }
+            renderUI();
+        }
+
+        let timerInterval = null;
         function runTimerEngine() {
             if (timerInterval) clearInterval(timerInterval);
             timerInterval = setInterval(() => {
-                if (totalSeconds < 2700) { // Giới hạn 45 phút (2700 giây)
-                    totalSeconds++;
-                    localStorage.setItem('t_seconds', totalSeconds);
-                    updateUI();
-                } else {
-                    pauseTimer();
+                let data = loadData();
+                if (data.isRunning) {
+                    if (data.totalSeconds < 2700) { // Giới hạn 45 phút
+                        localStorage.setItem('t_seconds', data.totalSeconds + 1);
+                    } else {
+                        pauseTimer();
+                    }
                 }
+                renderUI();
             }, 1000);
         }
 
         function startTimer() {
-            if (!isRunning) {
-                isRunning = true;
-                localStorage.setItem('t_running', 'true');
-                runTimerEngine();
-            }
+            localStorage.setItem('t_running', 'true');
+            runTimerEngine();
         }
 
         function pauseTimer() {
-            isRunning = false;
             localStorage.setItem('t_running', 'false');
-            if (timerInterval) clearInterval(timerInterval);
         }
 
         function resetTimer() {
             pauseTimer();
-            totalSeconds = 0;
             localStorage.setItem('t_seconds', 0);
-            updateUI();
+            renderUI();
         }
 
-        // Đồng bộ lên giao diện
-        function updateUI() {
-            document.getElementById('view-team1').innerText = t1Name;
-            document.getElementById('view-team2').innerText = t2Name;
-            document.getElementById('view-score1').innerText = score1;
-            document.getElementById('view-score2').innerText = score2;
-            document.getElementById('ctrl-score1').innerText = score1;
-            document.getElementById('ctrl-score2').innerText = score2;
-            document.getElementById('view-timer').innerText = formatTime(totalSeconds);
+        // Tự động quét dữ liệu mỗi 300ms để bắt thay đổi lập tức qua lại giữa OBS và trình duyệt điều khiển
+        setInterval(() => {
+            renderUI();
+        }, 300);
+
+        if (loadData().isRunning) {
+            runTimerEngine();
         }
 
-        // Lắng nghe thay đổi khi mở nhiều tab đồng bộ
-        window.addEventListener('storage', (event) => {
-            if (event.key === 't1_name') { t1Name = event.newValue; document.getElementById('input-team1').value = t1Name; }
-            if (event.key === 't2_name') { t2Name = event.newValue; document.getElementById('input-team2').value = t2Name; }
-            if (event.key === 't1_score') { score1 = parseInt(event.newValue) || 0; }
-            if (event.key === 't2_score') { score2 = parseInt(event.newValue) || 0; }
-            if (event.key === 't_seconds') { totalSeconds = parseInt(event.newValue) || 0; }
-            if (event.key === 't_running') {
-                let shouldRun = event.newValue === 'true';
-                if (shouldRun && !isRunning) { isRunning = true; runTimerEngine(); }
-                else if (!shouldRun && isRunning) { pauseTimer(); }
-            }
-            updateUI();
-        });
+        renderUI();
     </script>
 </body>
 </html>
