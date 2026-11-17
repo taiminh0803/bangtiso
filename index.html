@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Bảng Tỉ Số & Đồng Hồ Thể Thao OBS</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: transparent; /* Giữ trong suốt để đưa vào OBS */
+            margin: 0;
+            padding: 20px;
+        }
+
+        /* --- KHUNG HIỂN THỊ TRÊN OBS --- */
+        .scoreboard-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            filter: drop-shadow(0px 8px 15px rgba(0, 0, 0, 0.4));
+            margin-bottom: 40px;
+        }
+
+        /* Cánh trái (Đội 1) - Vạt góc đúng chuẩn hình mẫu */
+        .team-box.left {
+            background: linear-gradient(135deg, #7c95a8, #5a7385);
+            color: white;
+            padding: 14px 35px;
+            font-size: 26px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
+            text-align: right;
+            min-width: 240px;
+            border-top: 2px solid rgba(255,255,255,0.2);
+        }
+
+        /* Khối giữa (Tỉ số & Đồng hồ) */
+        .center-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 2;
+            margin: 0 -15px;
+        }
+
+        .timer-badge {
+            background: #4a5c6d;
+            color: #ffffff;
+            font-size: 13px;
+            font-weight: 700;
+            padding: 4px 18px;
+            letter-spacing: 1.5px;
+            clip-path: polygon(10% 0, 90% 0, 100% 100%, 0 100%);
+            margin-bottom: -5px;
+            border-top: 1px solid rgba(255,255,255,0.3);
+            min-width: 100px;
+            text-align: center;
+        }
+
+        .score-display {
+            background: linear-gradient(135deg, #0b4da2, #002e6d);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 8px 30px;
+            font-size: 38px;
+            font-weight: 900;
+            clip-path: polygon(12% 0, 88% 0, 100% 100%, 0 100%);
+            border: 2px solid #3b82f6;
+            min-width: 170px;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+        }
+
+        .score-num {
+            min-width: 45px;
+            text-align: center;
+            color: #ffffff;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .score-divider {
+            margin: 0 5px;
+            color: #93c5fd;
+        }
+
+        /* Cánh phải (Đội 2) - Vạt góc đúng chuẩn hình mẫu */
+        .team-box.right {
+            background: linear-gradient(135deg, #5a7385, #7c95a8);
+            color: white;
+            padding: 14px 35px;
+            font-size: 26px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            clip-path: polygon(0 0, 90% 0, 100% 100%, 0 100%);
+            text-align: left;
+            min-width: 240px;
+            border-top: 2px solid rgba(255,255,255,0.2);
+        }
+
+
+        /* --- BẢNG ĐIỀU KHIỂN TRỰC TIẾP --- */
+        .control-panel {
+            background: #ffffff;
+            color: #333;
+            padding: 25px;
+            border-radius: 12px;
+            max-width: 500px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            border: 1px solid #e5e7eb;
+        }
+        .control-panel h3 { margin-top: 0; color: #1f2937; border-bottom: 2px solid #f3f4f6; padding-bottom: 10px; }
+        .control-group {
+            margin-bottom: 15px;
+            background: #f9fafb;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #f3f4f6;
+        }
+        .control-group label { display: block; font-weight: bold; margin-bottom: 5px; color: #4b5563; font-size: 14px; }
+        .control-group input[type="text"] {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 16px;
+            margin-bottom: 8px;
+        }
+        .btn-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        button {
+            padding: 6px 12px;
+            font-size: 14px;
+            cursor: pointer;
+            font-weight: bold;
+            border: none;
+            border-radius: 6px;
+            background-color: #2563eb;
+            color: white;
+            transition: 0.15s;
+        }
+        button:hover { background-color: #1d4ed8; }
+        button.minus { background-color: #dc2626; }
+        button.minus:hover { background-color: #b91c1c; }
+        button.timer-btn { background-color: #059669; }
+        button.timer-btn:hover { background-color: #047857; }
+        button.reset-btn { background-color: #4b5563; }
+        button.reset-btn:hover { background-color: #374151; }
+        .score-val-label { font-weight: bold; margin-left: auto; font-size: 16px; color: #1f2937; }
+    </style>
+</head>
+<body>
+
+    <!-- KHUNG HIỂN THỊ TRÊN OBS -->
+    <div class="scoreboard-container">
+        <div class="team-box left" id="view-team1">TEAM 1</div>
+        
+        <div class="center-box">
+            <div class="timer-badge" id="view-timer">00:00</div>
+            <div class="score-display">
+                <span class="score-num" id="view-score1">0</span>
+                <span class="score-divider">-</span>
+                <span class="score-num" id="view-score2">0</span>
+            </div>
+        </div>
+
+        <div class="team-box right" id="view-team2">TEAM 2</div>
+    </div>
+
+    <!-- BẢNG ĐIỀU KHIỂN TRỰC TIẾP -->
+    <div class="control-panel" id="control-panel-ui">
+        <h3>Bảng Điều Khiển Tỉ Số & Đồng Hồ</h3>
+        
+        <!-- Điều khiển Đồng Hồ -->
+        <div class="control-group">
+            <label>Đồng hồ thời gian (00:00 - 45:00):</label>
+            <div class="btn-row">
+                <button class="timer-btn" onclick="startTimer()">Bắt đầu</button>
+                <button class="timer-btn" onclick="pauseTimer()">Tạm dừng</button>
+                <button class="reset-btn" onclick="resetTimer()">Reset (00:00)</button>
+            </div>
+        </div>
+
+        <!-- Điều khiển Đội 1 -->
+        <div class="control-group">
+            <label>Đội 1 (Bên trái):</label>
+            <input type="text" id="input-team1" value="TEAM 1" oninput="updateTeamNames()">
+            <div class="btn-row">
+                <button onclick="changeScore(1, 1)">+1 Điểm</button>
+                <button class="minus" onclick="changeScore(1, -1)">-1 Điểm</button>
+                <span class="score-val-label">Điểm: <span id="ctrl-score1">0</span></span>
+            </div>
+        </div>
+
+        <!-- Điều khiển Đội 2 -->
+        <div class="control-group">
+            <label>Đội 2 (Bên phải):</label>
+            <input type="text" id="input-team2" value="TEAM 2" oninput="updateTeamNames()">
+            <div class="btn-row">
+                <button onclick="changeScore(2, 1)">+1 Điểm</button>
+                <button class="minus" onclick="changeScore(2, -1)">-1 Điểm</button>
+                <span class="score-val-label">Điểm: <span id="ctrl-score2">0</span></span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Khởi tạo giá trị từ localStorage
+        let t1Name = localStorage.getItem('t1_name') || 'TEAM 1';
+        let t2Name = localStorage.getItem('t2_name') || 'TEAM 2';
+        let score1 = parseInt(localStorage.getItem('t1_score')) || 0;
+        let score2 = parseInt(localStorage.getItem('t2_score')) || 0;
+        
+        // Đồng hồ (tính bằng giây, giới hạn tối đa 45 phút = 2700 giây)
+        let totalSeconds = parseInt(localStorage.getItem('t_seconds')) || 0;
+        let timerInterval = null;
+        let isRunning = localStorage.getItem('t_running') === 'true';
+
+        // Gán giá trị ban đầu vào form
+        document.getElementById('input-team1').value = t1Name;
+        document.getElementById('input-team2').value = t2Name;
+
+        updateUI();
+
+        if (isRunning) {
+            runTimerEngine();
+        }
+
+        // Cập nhật tên đội
+        function updateTeamNames() {
+            t1Name = document.getElementById('input-team1').value || 'TEAM 1';
+            t2Name = document.getElementById('input-team2').value || 'TEAM 2';
+            localStorage.setItem('t1_name', t1Name);
+            localStorage.setItem('t2_name', t2Name);
+            updateUI();
+        }
+
+        // Thay đổi điểm số
+        function changeScore(team, delta) {
+            if (team === 1) {
+                score1 += delta;
+                if (score1 < 0) score1 = 0;
+                localStorage.setItem('t1_score', score1);
+            } else {
+                score2 += delta;
+                if (score2 < 0) score2 = 0;
+                localStorage.setItem('t2_score', score2);
+            }
+            updateUI();
+        }
+
+        // --- CÁC HÀM ĐIỀU KHIỂN ĐỒNG HỒ ---
+        function formatTime(seconds) {
+            let m = Math.floor(seconds / 60);
+            let s = seconds % 60;
+            return (m < 10 ? "0" + m : m) + ":" + (s < 10 ? "0" + s : s);
+        }
+
+        function runTimerEngine() {
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                if (totalSeconds < 2700) { // Giới hạn 45 phút (2700 giây)
+                    totalSeconds++;
+                    localStorage.setItem('t_seconds', totalSeconds);
+                    updateUI();
+                } else {
+                    pauseTimer();
+                }
+            }, 1000);
+        }
+
+        function startTimer() {
+            if (!isRunning) {
+                isRunning = true;
+                localStorage.setItem('t_running', 'true');
+                runTimerEngine();
+            }
+        }
+
+        function pauseTimer() {
+            isRunning = false;
+            localStorage.setItem('t_running', 'false');
+            if (timerInterval) clearInterval(timerInterval);
+        }
+
+        function resetTimer() {
+            pauseTimer();
+            totalSeconds = 0;
+            localStorage.setItem('t_seconds', 0);
+            updateUI();
+        }
+
+        // Đồng bộ lên giao diện
+        function updateUI() {
+            document.getElementById('view-team1').innerText = t1Name;
+            document.getElementById('view-team2').innerText = t2Name;
+            document.getElementById('view-score1').innerText = score1;
+            document.getElementById('view-score2').innerText = score2;
+            document.getElementById('ctrl-score1').innerText = score1;
+            document.getElementById('ctrl-score2').innerText = score2;
+            document.getElementById('view-timer').innerText = formatTime(totalSeconds);
+        }
+
+        // Lắng nghe thay đổi khi mở nhiều tab đồng bộ
+        window.addEventListener('storage', (event) => {
+            if (event.key === 't1_name') { t1Name = event.newValue; document.getElementById('input-team1').value = t1Name; }
+            if (event.key === 't2_name') { t2Name = event.newValue; document.getElementById('input-team2').value = t2Name; }
+            if (event.key === 't1_score') { score1 = parseInt(event.newValue) || 0; }
+            if (event.key === 't2_score') { score2 = parseInt(event.newValue) || 0; }
+            if (event.key === 't_seconds') { totalSeconds = parseInt(event.newValue) || 0; }
+            if (event.key === 't_running') {
+                let shouldRun = event.newValue === 'true';
+                if (shouldRun && !isRunning) { isRunning = true; runTimerEngine(); }
+                else if (!shouldRun && isRunning) { pauseTimer(); }
+            }
+            updateUI();
+        });
+    </script>
+</body>
+</html>
